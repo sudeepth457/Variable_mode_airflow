@@ -1,0 +1,72 @@
+from datetime import timedelta
+import requests
+import smtplib
+from airflow.models import Variable
+# The DAG object; we'll need this to instantiate a DAG
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+from airflow.utils.dates import days_ago
+# These args will get passed on to each operator
+# You can override them on a per-task basis during operator initialization
+
+def start():
+    print("Starting Execution")
+
+def get_data():
+    import_data = requests.get("https://catfact.ninja/fact")
+    data = import_data.json()
+    print(data['fact'])
+
+def send_mail():
+    server = smtplib.SMTP_SSL("smtp.gmail.com",465)
+    server.login(Variable.get('sender_email'),Variable.get('sender_password'))
+    server.sendmail("testp5091@gmail.com","sudeepth457@gmail.com","test mail")
+    server.quit()
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email': ['airflow@example.com'],
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+    # 'queue': 'bash_queue',
+    # 'pool': 'backfill',
+    # 'priority_weight': 10,
+    # 'end_date': datetime(2016, 1, 1),
+    # 'wait_for_downstream': False,
+    # 'dag': dag,
+    # 'sla': timedelta(hours=2),
+    # 'execution_timeout': timedelta(seconds=300),
+    # 'on_failure_callback': some_function,
+    # 'on_success_callback': some_other_function,
+    # 'on_retry_callback': another_function,
+    # 'sla_miss_callback': yet_another_function,
+    # 'trigger_rule': 'all_success'
+}
+with DAG(
+    'my_first_project',
+    default_args=default_args,
+    description='A simple tutorial DAG',
+    schedule_interval='*/5 * * * *',
+    start_date=days_ago(1),
+    tags=['example'],
+) as dag:
+    t1 = PythonOperator(
+        task_id = 'Print',
+        python_callable =  start,
+
+    )
+
+    t2 = PythonOperator(
+        task_id = 'get_cat_fact',
+        python_callable = get_data,
+    )
+
+    t3 = PythonOperator(
+        task_id = 'send_mail',
+        python_callable = send_mail,
+    )
+
+    t2 >> [t1,t3]
